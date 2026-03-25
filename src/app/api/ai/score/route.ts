@@ -16,7 +16,7 @@ import { scoreLeadWithGemini } from "@/lib/gemini";
 
 const bodySchema = z.object({
   sheetRow: z.number().int().min(2),
-  /** If true, writes AI_Score, AI_Tier, AI_Reason when those columns exist */
+  /** If true, writes AI_Score and AI_Recommendations when those columns exist */
   applyToSheet: z.boolean().optional(),
 });
 
@@ -117,10 +117,8 @@ export async function POST(request: Request) {
       const keys = columns.map((c) => c.key);
       const updates: Record<string, string> = {};
       if (keys.includes("AI_Score")) updates.AI_Score = String(result.score);
-      if (keys.includes("AI_Tier")) updates.AI_Tier = String(result.tier);
-      if (keys.includes("AI_Reason")) updates.AI_Reason = result.reason;
-      if (keys.includes("AI_Run_At")) {
-        updates.AI_Run_At = new Date().toISOString();
+      if (keys.includes("AI_Recommendations")) {
+        updates.AI_Recommendations = result.reason;
       }
 
       if (Object.keys(updates).length > 0) {

@@ -34,7 +34,7 @@ Never commit real `GOOGLE_SERVICE_ACCOUNT_JSON`. Use `.env.local` (gitignored) o
 | ------ | ---- | ------- |
 | GET | `/api/deals` | List deals (columns + `_sheetRow` on each row) |
 | PATCH | `/api/deals/[row]` | Update cells for sheet row `row` (JSON body: column keys → values) |
-| POST | `/api/ai/score` | Body `{ "sheetRow": number, "applyToSheet"?: boolean }` — Vertex Gemini |
+| POST | `/api/ai/score` | Body `{ "sheetRow": number, "applyToSheet"?: boolean }` — writes **`AI_Score`** + **`AI_Recommendations`** when those columns exist (OpenAI / Gemini / Vertex) |
 | POST | `/api/slack/notify` | Body `{ "text": string }` — requires `SLACK_WEBHOOK_URL` |
 
 See [INTEGRATIONS.md](./INTEGRATIONS.md) for GCP and Slack setup.
