@@ -37,8 +37,8 @@ export default function RootLayout({
               <ThemeToggle />
             </div>
           </div>
-          {/* Reserve space so theme control never covers page chrome (esp. AI agent header). */}
-          <div className="min-h-screen pr-14 sm:pr-16">{children}</div>
+          {/* Reserve space for fixed theme toggle from `sm` up; mobile keeps symmetric page margins. */}
+          <div className="min-h-screen max-sm:pr-0 sm:pr-14 md:pr-16">{children}</div>
         </ThemeProvider>
       </body>
     </html>

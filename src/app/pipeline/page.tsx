@@ -45,6 +45,29 @@ function resolveColumnKey(columns: ColumnDef[], candidates: string[]): string | 
   return null;
 }
 
+/** Serial / deal # columns — tighter width so other columns get more room on narrow screens. */
+function tableColumnWidths(col: ColumnDef): { th: string; td: string } {
+  const label = col.label.toLowerCase();
+  const key = col.key.toLowerCase();
+  const narrow =
+    /\bs\.?\s*no\.?\b/.test(label) ||
+    /\bdeal\s*no\.?\b/.test(label) ||
+    /\bserial\b/.test(label) ||
+    key.includes("deal no") ||
+    key.includes("s.no") ||
+    key.includes("s. no");
+  if (narrow) {
+    return {
+      th: "px-2 py-3.5 font-semibold w-[3.75rem] min-w-[3.25rem] max-w-[4.5rem] whitespace-nowrap",
+      td: "max-w-[4.5rem] px-2 py-3 align-top text-app-text tabular-nums whitespace-nowrap",
+    };
+  }
+  return {
+    th: "px-4 py-3.5 font-semibold min-w-[120px]",
+    td: "max-w-[260px] px-4 py-3 align-top text-app-text",
+  };
+}
+
 type DealsResponse = {
   columns?: ColumnDef[];
   rowCount?: number;
@@ -869,11 +892,14 @@ export default function PipelinePage() {
               <table className="w-full min-w-[880px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-app-border bg-app-surface2/50 text-[11px] uppercase tracking-wider text-app-muted dark:bg-white/[0.03]">
-                    {visibleColumns.map((col) => (
-                      <th key={col.key} className="px-4 py-3.5 font-semibold min-w-[120px]">
-                        {col.label}
-                      </th>
-                    ))}
+                    {visibleColumns.map((col) => {
+                      const cw = tableColumnWidths(col);
+                      return (
+                        <th key={col.key} className={cw.th}>
+                          {col.label}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -889,6 +915,7 @@ export default function PipelinePage() {
                         }`}
                       >
                         {visibleColumns.map((col) => {
+                          const cw = tableColumnWidths(col);
                           const editing =
                             activeCell?.row._sheetRow === row._sheetRow &&
                             activeCell.colKey === col.key;
@@ -914,7 +941,7 @@ export default function PipelinePage() {
                           return (
                             <td
                               key={col.key}
-                              className="max-w-[260px] px-4 py-3 align-top text-app-text"
+                              className={cw.td}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openCellEdit(row._sheetRow, col.key);
