@@ -25,10 +25,10 @@ export const PIPELINE_HIDDEN_COLUMN_KEYS = new Set([
 ]);
 
 /**
- * Preset order for stage dropdowns and UI lists.
- * Display order: To be contacted is last; Evaluation follows Landlord interested.
+ * Preset order for stage dropdowns and UI lists — forward pipeline order (queue → closed).
  */
 export const STAGE_ORDER = [
+  "To be contacted",
   "In touch",
   "Landlord interested",
   "Evaluation in progress",
@@ -36,7 +36,6 @@ export const STAGE_ORDER = [
   "Negotiations started",
   "Offer Extended",
   "Under contract",
-  "To be contacted",
 ] as const;
 
 export function parseRent(value: string | number | undefined): number | null {
@@ -61,16 +60,16 @@ const STAGE_SEMANTIC_RANK: Record<string, number> = {
   under_contract: 7,
 };
 
-/** UI sort: In touch → … → Under contract → To be contacted last. */
+/** UI sort: same as funnel order — To be contacted → … → Under contract; ad-hoc stages last. */
 const STAGE_DISPLAY_RANK: Record<string, number> = {
-  in_touch: 0,
-  landlord_interested: 1,
-  evaluation_in_progress: 2,
-  qualified: 3,
-  negotiations_started: 4,
-  offer_extended: 5,
-  under_contract: 6,
-  to_be_contacted: 7,
+  to_be_contacted: 0,
+  in_touch: 1,
+  landlord_interested: 2,
+  evaluation_in_progress: 3,
+  qualified: 4,
+  negotiations_started: 5,
+  offer_extended: 6,
+  under_contract: 7,
 };
 
 export function stageSortIndex(stage: string): number {

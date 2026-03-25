@@ -154,9 +154,12 @@ export default function PipelinePage() {
     [dealsForStageStats],
   );
   const stageOptions = useMemo(() => {
-    return Array.from(stageCounts.keys()).sort(
-      (a, b) => stageSortIndex(a) - stageSortIndex(b),
-    );
+    return Array.from(stageCounts.keys()).sort((a, b) => {
+      const ia = stageSortIndex(a);
+      const ib = stageSortIndex(b);
+      if (ia !== ib) return ia - ib;
+      return a.localeCompare(b);
+    });
   }, [stageCounts]);
 
   const ownerCounts = useMemo(() => {
