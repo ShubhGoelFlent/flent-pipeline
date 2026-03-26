@@ -26,11 +26,11 @@ cd "/Users/shubhgoel/Downloads/Shubh college memories/Flent Onboarding Forms/fle
 4. **Do not** add README, .gitignore, or license (this repo already has files).
 5. Click **Create repository**.
 
-Copy the repo URL GitHub shows you. It looks like:
+Copy the repo URL GitHub shows you. For your account (**ShubhGoelFlent**) it looks like:
 
-- `https://github.com/YOUR_USERNAME/flent-pipeline.git`  
+- `https://github.com/ShubhGoelFlent/flent-pipeline.git`  
   or  
-- `git@github.com:YOUR_USERNAME/flent-pipeline.git`
+- `git@github.com:ShubhGoelFlent/flent-pipeline.git`
 
 ## 4. Stage and commit your work (if you have uncommitted changes)
 
@@ -47,10 +47,10 @@ If Git says “nothing to commit”, your tree is already committed — skip to 
 **First time only** — connect your local repo to GitHub:
 
 ```bash
-git remote add origin https://github.com/YOUR_USERNAME/flent-pipeline.git
+git remote add origin https://github.com/ShubhGoelFlent/flent-pipeline.git
 ```
 
-Replace `YOUR_USERNAME` and repo name with yours.
+(If your repo name differs, change `flent-pipeline` in the URL. Use another username only if you’re not ShubhGoelFlent.)
 
 **Push:**
 
@@ -80,6 +80,6 @@ Refresh the repo page; you should see your files.
 
 ```bash
 git remote -v
-git remote set-url origin https://github.com/YOUR_USERNAME/flent-pipeline.git
+git remote set-url origin https://github.com/ShubhGoelFlent/flent-pipeline.git
 git push -u origin main
 ```

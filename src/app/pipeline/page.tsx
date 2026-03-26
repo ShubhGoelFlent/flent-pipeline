@@ -21,6 +21,7 @@ import {
   isWithinLastDays,
   stageSortIndex,
   stageBadgeClass,
+  stageConcept,
 } from "./helpers";
 import { DROPDOWN_COLUMN_KEYS, selectOptionsForColumn } from "./columnOptions";
 import { getAiPicksToBeContacted } from "@/lib/agentRules";
@@ -77,8 +78,49 @@ type DealsResponse = {
   message?: string;
 };
 
-type ViewMode = "table" | "stages";
+type ViewMode = "table" | "kanban";
 type DealSortOrder = "latest_to_oldest" | "oldest_to_latest";
+
+const EXCLUDED_KANBAN_STAGE_NORMALIZED = new Set([
+  "not picking up",
+]);
+
+function canonicalKanbanStageLabel(stage: string): string {
+  const raw = String(stage ?? "").trim();
+  if (!raw) return "";
+  const concept = stageConcept(raw);
+  switch (concept) {
+    case "to_be_contacted":
+      // Keep the dedicated POC sub-stage as a separate first column.
+      if (raw.toLowerCase() === "to be contacted (poc)") return "To be contacted (POC)";
+      return "To be contacted";
+    case "in_touch":
+      return "In touch";
+    case "landlord_interested":
+      return "Landlord interested";
+    case "evaluation_in_progress":
+      return "Evaluation in progress";
+    case "qualified":
+      return "Qualified";
+    case "negotiations_started":
+      return "Negotiations started";
+    case "offer_extended":
+      return "Offer Extended";
+    case "under_contract":
+      return "Under contract";
+    default:
+      return raw;
+  }
+}
+
+function shouldShowKanbanStage(stage: string): boolean {
+  const normalized = String(stage ?? "").trim().toLowerCase();
+  if (!normalized) return false;
+  if (EXCLUDED_KANBAN_STAGE_NORMALIZED.has(normalized)) return false;
+  // Guard against accidental date values used as stage names.
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(normalized)) return false;
+  return true;
+}
 
 export default function PipelinePage() {
   const [data, setData] = useState<DealsResponse | null>(null);
@@ -100,6 +142,9 @@ export default function PipelinePage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<string | null>(null);
+  const [draggingRow, setDraggingRow] = useState<number | null>(null);
+  const [dropStage, setDropStage] = useState<string | null>(null);
+  const [movingRow, setMovingRow] = useState<number | null>(null);
 
   /** Single-cell inline edit: explicit Save / Cancel only (no blur autosave). */
   const [activeCell, setActiveCell] = useState<{
@@ -275,6 +320,40 @@ export default function PipelinePage() {
       return a.localeCompare(b);
     });
   }, [visibleDeals]);
+
+  /** Kanban should always show full stage columns, even if some are empty. */
+  const kanbanColumns = useMemo(() => {
+    const stageOpts = selectOptionsForColumn(STAGE_KEY, deals).filter(Boolean);
+    if (stageFilter && !stageOpts.includes(stageFilter)) stageOpts.push(stageFilter);
+
+    const canonical = new Map<string, true>();
+    for (const s of stageOpts) {
+      const label = canonicalKanbanStageLabel(s);
+      if (!shouldShowKanbanStage(label)) continue;
+      canonical.set(label, true);
+    }
+    return [...canonical.keys()].sort((a, b) => {
+      const ia = stageSortIndex(a);
+      const ib = stageSortIndex(b);
+      if (ia !== ib) return ia - ib;
+      return a.localeCompare(b);
+    });
+  }, [deals, stageFilter]);
+
+  const kanbanByStage = useMemo(() => {
+    const m = new Map<string, Deal[]>();
+    for (const stage of kanbanColumns) {
+      m.set(stage, []);
+    }
+    for (const d of visibleDeals) {
+      const s = canonicalKanbanStageLabel(String(d[STAGE_KEY] ?? "").trim());
+      if (!shouldShowKanbanStage(s)) continue;
+      if (!s) continue;
+      if (!m.has(s)) m.set(s, []);
+      m.get(s)!.push(d);
+    }
+    return m;
+  }, [kanbanColumns, visibleDeals]);
 
   const kpis = useMemo(() => {
     const total = deals.length;
@@ -563,6 +642,63 @@ export default function PipelinePage() {
       setAiLoading(false);
     }
   };
+
+  const moveDealToStage = useCallback(
+    async (rowId: number, targetStage: string) => {
+      const row = dealsRef.current.find((d) => d._sheetRow === rowId);
+      if (!row) return;
+      const prevStage = String(row[STAGE_KEY] ?? "").trim();
+      if (!targetStage || prevStage === targetStage) return;
+
+      setSaveError(null);
+      setMovingRow(rowId);
+
+      const applyLocalStage = (stage: string) => {
+        setData((prevData) => {
+          if (!prevData?.deals) return prevData;
+          return {
+            ...prevData,
+            deals: prevData.deals.map((d) =>
+              d._sheetRow === rowId ? { ...d, [STAGE_KEY]: stage } : d,
+            ),
+          };
+        });
+        setSelected((prevSel) =>
+          prevSel && prevSel._sheetRow === rowId
+            ? { ...prevSel, [STAGE_KEY]: stage }
+            : prevSel,
+        );
+        setEditDraft((ed) => {
+          const sel = selectedRef.current;
+          if (sel && sel._sheetRow === rowId) {
+            return { ...ed, [STAGE_KEY]: stage };
+          }
+          return ed;
+        });
+      };
+
+      applyLocalStage(targetStage);
+
+      try {
+        const res = await fetch(`/api/deals/${rowId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [STAGE_KEY]: targetStage }),
+        });
+        const json = (await res.json()) as { error?: string; message?: string };
+        if (!res.ok) {
+          applyLocalStage(prevStage);
+          setSaveError(json.message ?? json.error ?? "Save failed");
+        }
+      } catch {
+        applyLocalStage(prevStage);
+        setSaveError("Network error while saving.");
+      } finally {
+        setMovingRow(null);
+      }
+    },
+    [],
+  );
 
   return (
     <div className="min-h-screen bg-app-bg text-app-text flex flex-col">
@@ -860,14 +996,14 @@ export default function PipelinePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setViewMode("stages")}
+                  onClick={() => setViewMode("kanban")}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                    viewMode === "stages"
+                    viewMode === "kanban"
                       ? "bg-white text-app-text shadow-sm ring-1 ring-app-border/50 dark:bg-white/15 dark:text-white dark:ring-white/10"
                       : "text-app-muted hover:text-app-text"
                   }`}
                 >
-                  By stage
+                  Kanban
                 </button>
               </div>
               <label className="inline-flex items-center gap-2 rounded-full border border-app-border bg-app-surface px-3 py-2 text-xs text-app-muted dark:bg-app-panel/80">
@@ -923,8 +1059,8 @@ export default function PipelinePage() {
           {!loading && !data?.error && viewMode === "table" && visibleDeals.length > 0 && (
             <div className="overflow-x-auto rounded-2xl border border-app-border bg-app-panel/95 shadow-brand backdrop-blur-sm">
               <table className="w-full min-w-[880px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-app-border bg-app-surface2/50 text-[11px] uppercase tracking-wider text-app-muted dark:bg-white/[0.03]">
+                <thead className="sticky top-0 z-20">
+                  <tr className="border-b border-app-border bg-app-surface2/95 text-[11px] uppercase tracking-wider text-app-muted backdrop-blur supports-[backdrop-filter]:bg-app-surface2/85 dark:bg-white/[0.08]">
                     {visibleColumns.map((col) => {
                       const cw = tableColumnWidths(col);
                       return (
@@ -1060,97 +1196,117 @@ export default function PipelinePage() {
             </div>
           )}
 
-          {!loading && !data?.error && viewMode === "stages" && visibleDeals.length > 0 && (
-            <div className="space-y-6">
-              {groupedEntries.map(([stage, rows]) => (
-                <section key={stage || "__no_stage__"}>
-                  <div className="flex items-baseline gap-3 mb-2">
-                    {stage ? (
-                      <span
-                        className={`stage-badge inline-flex rounded-full border px-3 py-1 text-sm font-medium ${stageBadgeClass(stage)}`}
-                      >
-                        {stage}
-                      </span>
-                    ) : (
-                      <span className="text-sm font-medium text-app-muted">
-                        No stage set
-                      </span>
-                    )}
-                    <span className="text-xs text-app-muted">{rows.length} leads</span>
-                  </div>
-                  <div className="overflow-x-auto rounded-2xl border border-app-border bg-app-panel/95 shadow-brand backdrop-blur-sm">
-                    <table className="w-full min-w-[640px] text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-app-border bg-app-surface2/50 text-[11px] uppercase tracking-wider text-app-muted dark:bg-white/[0.03]">
-                          <th className="px-3 py-2.5 font-semibold whitespace-nowrap">
-                            Deal No
-                          </th>
-                          <th className="px-3 py-2.5 font-semibold whitespace-nowrap">
-                            Source
-                          </th>
-                          <th className="px-3 py-2.5 font-semibold whitespace-nowrap">
-                            Price
-                          </th>
-                          <th className="px-3 py-2.5 font-semibold whitespace-nowrap">
-                            Locality
-                          </th>
-                          <th className="min-w-[120px] px-3 py-2.5 font-semibold">
-                            Furnishing Status
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
+          {!loading && !data?.error && viewMode === "kanban" && (
+            <div className="overflow-x-auto pb-3">
+              <div className="flex min-w-max items-start gap-4">
+                {kanbanColumns.map((stage) => {
+                  const rows = kanbanByStage.get(stage) ?? [];
+                  const dropActive = dropStage === stage;
+                  return (
+                    <section
+                      key={stage}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDropStage(stage);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const transferred = Number.parseInt(
+                          e.dataTransfer.getData("text/plain"),
+                          10,
+                        );
+                        const rowId = Number.isFinite(transferred)
+                          ? transferred
+                          : draggingRow;
+                        setDropStage(null);
+                        setDraggingRow(null);
+                        if (!rowId) return;
+                        void moveDealToStage(rowId, stage);
+                      }}
+                      className={`w-[292px] shrink-0 rounded-2xl border bg-app-panel/95 p-3 shadow-brand backdrop-blur-sm transition ${
+                        dropActive
+                          ? "border-flentGreen/55 ring-2 ring-flentGreen/25"
+                          : "border-app-border"
+                      }`}
+                    >
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <span
+                          className={`stage-badge inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${stageBadgeClass(stage)}`}
+                        >
+                          {stage}
+                        </span>
+                        <span className="text-xs text-app-muted">
+                          {rows.length} deals
+                        </span>
+                      </div>
+
+                      <div className="space-y-2.5">
                         {rows.map((row) => {
                           const active = selected?._sheetRow === row._sheetRow;
+                          const pending = movingRow === row._sheetRow;
                           const cell = (key: string | null) =>
                             key ? String(row[key] ?? "").trim() || "—" : "—";
                           return (
-                            <tr
+                            <article
                               key={row._sheetRow}
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => openDealPanel(row)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  openDealPanel(row);
-                                }
+                              draggable={!pending}
+                              onDragStart={(e) => {
+                                setDraggingRow(row._sheetRow);
+                                e.dataTransfer.setData(
+                                  "text/plain",
+                                  String(row._sheetRow),
+                                );
+                                e.dataTransfer.effectAllowed = "move";
                               }}
-                              className={`cursor-pointer border-b border-app-border/50 transition-colors hover:bg-app-hover ${
-                                active
-                                  ? "bg-flentGreen/15 dark:bg-flentGreen/20"
-                                  : ""
+                              onDragEnd={() => {
+                                setDraggingRow(null);
+                                setDropStage(null);
+                              }}
+                              onClick={() => openDealPanel(row)}
+                              className={`cursor-pointer rounded-xl border px-3 py-2.5 transition ${
+                                pending
+                                  ? "border-app-border bg-app-surface2 opacity-60"
+                                  : active
+                                    ? "border-flentGreen/45 bg-flentGreen/12 dark:bg-flentGreen/20"
+                                    : "border-app-border bg-app-card hover:border-flentGreen/35 hover:bg-app-hover"
                               }`}
                             >
-                              <td className="px-3 py-2.5 tabular-nums text-app-text">
-                                {cell(stageViewKeys.dealNo)}
-                              </td>
-                              <td className="px-3 py-2.5 text-app-text max-w-[180px]">
-                                <span className="line-clamp-2 break-words">
-                                  {cell(stageViewKeys.source)}
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="truncate text-xs font-semibold uppercase tracking-wide text-app-muted">
+                                  Deal {cell(stageViewKeys.dealNo)}
+                                </p>
+                                <span className="text-[11px] tabular-nums text-app-muted">
+                                  #{row._sheetRow}
                                 </span>
-                              </td>
-                              <td className="px-3 py-2.5 text-app-text whitespace-nowrap">
-                                {cell(stageViewKeys.price)}
-                              </td>
-                              <td className="px-3 py-2.5 text-app-text max-w-[200px]">
-                                <span className="line-clamp-2 break-words">
-                                  {cell(stageViewKeys.locality)}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2.5 text-app-text max-w-[220px]">
-                                <span className="line-clamp-2 break-words">
-                                  {cell(stageViewKeys.furnishing)}
-                                </span>
-                              </td>
-                            </tr>
+                              </div>
+                              <p className="mt-1 line-clamp-2 text-sm font-medium text-app-text">
+                                {cell(stageViewKeys.locality)}
+                              </p>
+                              <div className="mt-2 flex items-center justify-between gap-2 text-xs text-app-muted">
+                                <span className="truncate">Src: {cell(stageViewKeys.source)}</span>
+                                <span className="whitespace-nowrap">{cell(stageViewKeys.price)}</span>
+                              </div>
+                              <p className="mt-1 line-clamp-1 text-xs text-app-muted">
+                                {cell(stageViewKeys.furnishing)}
+                              </p>
+                              {pending ? (
+                                <p className="mt-2 text-[11px] font-medium text-app-muted">
+                                  Updating stage…
+                                </p>
+                              ) : null}
+                            </article>
                           );
                         })}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              ))}
+                        {rows.length === 0 ? (
+                          <div className="rounded-xl border border-dashed border-app-border px-3 py-6 text-center text-xs text-app-muted">
+                            Drop deals here
+                          </div>
+                        ) : null}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
             </div>
           )}
         </main>

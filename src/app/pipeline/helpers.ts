@@ -28,6 +28,7 @@ export const PIPELINE_HIDDEN_COLUMN_KEYS = new Set([
  * Preset order for stage dropdowns and UI lists — forward pipeline order (queue → closed).
  */
 export const STAGE_ORDER = [
+  "To be contacted (POC)",
   "To be contacted",
   "In touch",
   "Landlord interested",
@@ -62,6 +63,7 @@ const STAGE_SEMANTIC_RANK: Record<string, number> = {
 
 /** UI sort: same as funnel order — To be contacted → … → Under contract; ad-hoc stages last. */
 const STAGE_DISPLAY_RANK: Record<string, number> = {
+  to_be_contacted_poc: -1,
   to_be_contacted: 0,
   in_touch: 1,
   landlord_interested: 2,
@@ -73,6 +75,13 @@ const STAGE_DISPLAY_RANK: Record<string, number> = {
 };
 
 export function stageSortIndex(stage: string): number {
+  const normalized = normalizeStage(stage);
+  const exactRank: Record<string, number> = {
+    "to be contacted (poc)": STAGE_DISPLAY_RANK.to_be_contacted_poc,
+  };
+  if (normalized in exactRank) {
+    return exactRank[normalized]!;
+  }
   const concept = stageConcept(stage);
   const rank: Record<string, number> = {
     ...STAGE_DISPLAY_RANK,
