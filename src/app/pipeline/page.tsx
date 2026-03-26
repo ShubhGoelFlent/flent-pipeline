@@ -1059,14 +1059,14 @@ export default function PipelinePage() {
           {!loading && !data?.error && viewMode === "table" && visibleDeals.length > 0 && (
             <div className="max-h-[72vh] overflow-auto rounded-2xl border border-app-border bg-app-panel/95 shadow-brand backdrop-blur-sm">
               <table className="w-full min-w-[880px] text-left text-sm">
-                <thead className="sticky top-0 z-30 bg-app-surface2/95 backdrop-blur supports-[backdrop-filter]:bg-app-surface2/85 dark:bg-white/[0.08]">
-                  <tr className="border-b border-app-border text-[11px] uppercase tracking-wider text-app-muted">
+                <thead className="sticky top-0 z-30">
+                  <tr className="border-b border-app-border text-[11px] uppercase tracking-wider text-app-muted shadow-[0_1px_0_0_rgba(148,163,184,0.35)]">
                     {visibleColumns.map((col) => {
                       const cw = tableColumnWidths(col);
                       return (
                         <th
                           key={col.key}
-                          className={`${cw.th} sticky top-0 z-30 bg-transparent`}
+                          className={`${cw.th} sticky top-0 z-30 bg-white dark:bg-[#0f172a]`}
                         >
                           {col.label}
                         </th>

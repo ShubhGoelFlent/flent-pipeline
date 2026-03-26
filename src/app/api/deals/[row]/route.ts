@@ -14,6 +14,17 @@ const STAGE_KEY = "Deal Stage";
 const DISQ_KEY = "Disqualified";
 const STAGE_ENTERED_AT_KEY = "Stage Entered At";
 const STAGE_TIME_COLUMNS: Record<string, string> = {
+  "to be contacted (poc)": "Time in To be contacted (POC)",
+  "to be contacted": "Time in To be contacted",
+  "in touch": "Time in In touch",
+  "landlord interested": "Time in Landlord interested",
+  "evaluation in progress": "Time in Evaluation in progress",
+  qualified: "Time in Qualified",
+  "negotiations started": "Time in Negotiations started",
+  "offer extended": "Time in Offer Extended",
+  "under contract": "Time in Under contract",
+};
+const LEGACY_STAGE_TIME_COLUMNS: Record<string, string> = {
   "to be contacted (poc)": "Time in To be contacted (POC) (mins)",
   "to be contacted": "Time in To be contacted (mins)",
   "in touch": "Time in In touch (mins)",
@@ -50,6 +61,36 @@ function canonicalStageForTiming(stage: string | number | undefined): string {
 function isDisqualifiedValue(value: string | number | undefined): boolean {
   const v = String(value ?? "").trim().toLowerCase();
   return v === "yes" || v === "y" || v === "true" || v === "1";
+}
+
+function parseDurationToMinutes(value: string | number | undefined): number {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return 0;
+  // Legacy numeric minutes.
+  if (/^\d+$/.test(raw)) return Number.parseInt(raw, 10);
+
+  let total = 0;
+  const dayMatch = raw.match(/(\d+)\s*d/);
+  const hourMatch = raw.match(/(\d+)\s*h/);
+  const minuteMatch = raw.match(/(\d+)\s*m/);
+  if (dayMatch) total += Number.parseInt(dayMatch[1], 10) * 24 * 60;
+  if (hourMatch) total += Number.parseInt(hourMatch[1], 10) * 60;
+  if (minuteMatch) total += Number.parseInt(minuteMatch[1], 10);
+  return Number.isFinite(total) ? total : 0;
+}
+
+function formatMinutesHuman(totalMinutes: number): string {
+  const mins = Math.max(0, Math.floor(totalMinutes));
+  const days = Math.floor(mins / (24 * 60));
+  const hours = Math.floor((mins % (24 * 60)) / 60);
+  const minutes = mins % 60;
+  if (days > 0) {
+    return minutes > 0 ? `${days}d ${hours}h ${minutes}m` : `${days}d ${hours}h`;
+  }
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+  return `${minutes}m`;
 }
 
 export async function PATCH(
@@ -152,9 +193,11 @@ export async function PATCH(
         if (enteredAt && !Number.isNaN(enteredAt.getTime())) {
           const elapsedMs = Date.now() - enteredAt.getTime();
           const elapsedMinutes = Math.max(0, Math.floor(elapsedMs / (1000 * 60)));
-          const prevMins = Number.parseInt(String(currentRow[timeCol] ?? "0"), 10);
-          const existingMinutes = Number.isFinite(prevMins) ? prevMins : 0;
-          updates[timeCol] = String(existingMinutes + elapsedMinutes);
+          const legacyCol = LEGACY_STAGE_TIME_COLUMNS[previousStageCanonical];
+          const existingMinutes = parseDurationToMinutes(
+            String(currentRow[timeCol] ?? currentRow[legacyCol] ?? ""),
+          );
+          updates[timeCol] = formatMinutesHuman(existingMinutes + elapsedMinutes);
         }
       }
     }
