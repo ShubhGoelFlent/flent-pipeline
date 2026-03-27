@@ -330,26 +330,6 @@ export default function PipelinePage() {
     });
   }, [filteredDeals, aiRecommendedOnly, aiRecommendedRows, sortOrder]);
 
-  /** Grouped by stage; empty string = missing stage (shown as "No stage set", not a funnel pill). */
-  const groupedEntries = useMemo(() => {
-    const m = new Map<string, Deal[]>();
-    for (const d of visibleDeals) {
-      const s = String(d[STAGE_KEY] ?? "").trim();
-      if (!m.has(s)) m.set(s, []);
-      m.get(s)!.push(d);
-    }
-    return [...m.entries()].sort(([a], [b]) => {
-      const emptyA = !a;
-      const emptyB = !b;
-      if (emptyA && !emptyB) return 1;
-      if (!emptyA && emptyB) return -1;
-      const ia = stageSortIndex(a);
-      const ib = stageSortIndex(b);
-      if (ia !== ib) return ia - ib;
-      return a.localeCompare(b);
-    });
-  }, [visibleDeals]);
-
   /** Kanban should always show full stage columns, even if some are empty. */
   const kanbanColumns = useMemo(() => {
     const stageOpts = selectOptionsForColumn(STAGE_KEY, deals).filter(Boolean);

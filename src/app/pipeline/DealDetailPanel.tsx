@@ -55,6 +55,16 @@ const DISQ_REASON_CANDIDATES = [
   "Disqualification Reason",
   "Comments final",
 ];
+const DEFAULT_DISQ_REASONS = [
+  "Unserviceable",
+  "Rent too high",
+  "Rented Out",
+  "Gone Cold",
+  "Not picking up",
+  "Duplicate lead",
+  "Already finalized",
+  "Other",
+];
 
 function resolveFirstExistingColumn(
   columns: ColumnDef[],
@@ -141,7 +151,9 @@ export function DealDetailPanel({
   onAiScore,
 }: Props) {
   const [showAllFields, setShowAllFields] = useState(false);
-  const [quickDisqReason, setQuickDisqReason] = useState("");
+  const [showDisqPicker, setShowDisqPicker] = useState(false);
+  const [quickDisqReason, setQuickDisqReason] = useState(DEFAULT_DISQ_REASONS[0]);
+  const [customDisqReason, setCustomDisqReason] = useState("");
 
   const listingUrl = String(selected[LISTING_LINK_KEY] ?? "").trim();
   const mapsUrl = String(selected["Google Map Location"] ?? "").trim();
@@ -149,6 +161,15 @@ export function DealDetailPanel({
     () => resolveFirstExistingColumn(columns, DISQ_REASON_CANDIDATES),
     [columns],
   );
+  const reasonOptions = useMemo(() => {
+    const existing = reasonKey
+      ? fieldOptions[reasonKey] ?? []
+      : [];
+    const set = new Set<string>([...DEFAULT_DISQ_REASONS, ...existing.filter(Boolean)]);
+    return [...set];
+  }, [fieldOptions, reasonKey]);
+  const finalReason =
+    quickDisqReason === "Other" ? customDisqReason.trim() : quickDisqReason.trim();
   const disqNow = String(editDraft[DISQ_KEY] ?? selected[DISQ_KEY] ?? "").trim();
   const isDisqualified =
     disqNow.toLowerCase() === "yes" ||
@@ -176,7 +197,15 @@ export function DealDetailPanel({
   );
 
   return (
-    <aside className="w-full max-w-[420px] shrink-0 border-l border-flentGreen/10 bg-app-panel flex flex-col h-full shadow-brand dark:border-flentNight/20">
+    <div className="fixed inset-0 z-[80] flex justify-end">
+      <button
+        type="button"
+        aria-label="Close details panel"
+        onClick={onClose}
+        className="h-full flex-1 bg-black/35 backdrop-blur-[1px]"
+      />
+      <aside className="h-screen w-full max-w-[420px] border-l border-flentGreen/10 bg-white shadow-brand dark:border-flentNight/20 dark:bg-[#0f172a]">
+      <div className="flex h-full flex-col">
       <div className="p-4 border-b border-app-border flex justify-between items-start gap-3 bg-gradient-to-br from-flentNight/12 via-app-panel to-flentGreen/[0.06] dark:from-flentNight/25 dark:via-app-panel dark:to-flentGreen/10">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] uppercase tracking-wider text-flentGreen font-medium dark:text-flentCyan/90">
@@ -256,22 +285,28 @@ export function DealDetailPanel({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+              if (!showDisqPicker) {
+                setShowDisqPicker(true);
+                return;
+              }
               setEditDraft((d) => ({
                 ...d,
                 [DISQ_KEY]: "Yes",
-                ...(reasonKey && quickDisqReason.trim()
-                  ? { [reasonKey]: quickDisqReason.trim() }
-                  : {}),
-              }))
-            }
+                ...(reasonKey && finalReason ? { [reasonKey]: finalReason } : {}),
+              }));
+              setShowDisqPicker(false);
+            }}
             className="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 dark:border-red-500/35 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/45"
           >
-            Disqualify now
+            {showDisqPicker ? "Confirm disqualify" : "Disqualify now"}
           </button>
           <button
             type="button"
-            onClick={() => setEditDraft((d) => ({ ...d, [DISQ_KEY]: "" }))}
+            onClick={() => {
+              setShowDisqPicker(false);
+              setEditDraft((d) => ({ ...d, [DISQ_KEY]: "" }));
+            }}
             className="rounded-lg border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text hover:bg-app-hover"
           >
             Reopen
@@ -280,16 +315,29 @@ export function DealDetailPanel({
             Status: {isDisqualified ? "Disqualified" : "Active"}
           </span>
         </div>
-        {reasonKey ? (
+        {showDisqPicker && reasonKey ? (
           <label className="mt-2 block">
             <span className="text-[11px] text-app-muted">Disq reason</span>
-            <input
-              type="text"
+            <select
               value={quickDisqReason}
               onChange={(e) => setQuickDisqReason(e.target.value)}
-              placeholder="Optional reason before Disqualify now"
               className="mt-1 w-full rounded-lg border border-app-border bg-app-input px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:outline-none focus:ring-2 focus:ring-ringBrand"
-            />
+            >
+              {reasonOptions.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+            {quickDisqReason === "Other" ? (
+              <input
+                type="text"
+                value={customDisqReason}
+                onChange={(e) => setCustomDisqReason(e.target.value)}
+                placeholder="Enter custom reason"
+                className="mt-2 w-full rounded-lg border border-app-border bg-app-input px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:outline-none focus:ring-2 focus:ring-ringBrand"
+              />
+            ) : null}
           </label>
         ) : null}
       </div>
@@ -381,6 +429,8 @@ export function DealDetailPanel({
           </div>
         </div>
       </div>
-    </aside>
+      </div>
+      </aside>
+    </div>
   );
 }
