@@ -1369,13 +1369,21 @@ export default function PipelinePage() {
                                     : "border-app-border bg-app-card hover:border-flentGreen/35 hover:bg-app-hover"
                               }`}
                             >
-                              <p className="mt-1 line-clamp-2 text-sm font-medium text-app-text">
-                                {cell(stageViewKeys.locality)}
-                              </p>
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="line-clamp-2 text-sm font-semibold text-app-text">
+                                  {cell(stageViewKeys.locality)}
+                                </p>
+                                <span className="shrink-0 text-[11px] tabular-nums text-app-muted">
+                                  #{row._sheetRow}
+                                </span>
+                              </div>
                               <div className="mt-2 flex items-center justify-between gap-2 text-xs text-app-muted">
                                 <span className="truncate">Src: {cell(stageViewKeys.source)}</span>
                                 <span className="whitespace-nowrap">{cell(stageViewKeys.price)}</span>
                               </div>
+                              <p className="mt-1 line-clamp-1 text-xs text-app-muted">
+                                Cluster: {cell(CLUSTER_KEY)}
+                              </p>
                               <p className="mt-1 line-clamp-1 text-xs text-app-muted">
                                 {cell(stageViewKeys.furnishing)}
                               </p>
