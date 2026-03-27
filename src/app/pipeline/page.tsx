@@ -148,6 +148,12 @@ function formatElapsedSince(isoValue: string): string | null {
   return `${minutes}m`;
 }
 
+function elapsedMinutesSince(isoValue: string): number | null {
+  const d = new Date(isoValue);
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / (1000 * 60)));
+}
+
 function isDisqualifiedValue(value: string | number | undefined): boolean {
   const v = String(value ?? "").trim().toLowerCase();
   return v === "yes" || v === "y" || v === "true" || v === "1";
@@ -1363,14 +1369,6 @@ export default function PipelinePage() {
                                     : "border-app-border bg-app-card hover:border-flentGreen/35 hover:bg-app-hover"
                               }`}
                             >
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="truncate text-xs font-semibold uppercase tracking-wide text-app-muted">
-                                  Deal {cell(stageViewKeys.dealNo)}
-                                </p>
-                                <span className="text-[11px] tabular-nums text-app-muted">
-                                  #{row._sheetRow}
-                                </span>
-                              </div>
                               <p className="mt-1 line-clamp-2 text-sm font-medium text-app-text">
                                 {cell(stageViewKeys.locality)}
                               </p>
@@ -1384,9 +1382,18 @@ export default function PipelinePage() {
                               {(() => {
                                 const enteredAt = String(row["Stage Entered At"] ?? "").trim();
                                 const elapsed = enteredAt ? formatElapsedSince(enteredAt) : null;
+                                const elapsedMins = enteredAt
+                                  ? elapsedMinutesSince(enteredAt)
+                                  : null;
                                 if (!elapsed) return null;
+                                const elapsedClass =
+                                  elapsedMins !== null && elapsedMins > 48 * 60
+                                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                                    : elapsedMins !== null && elapsedMins > 24 * 60
+                                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                                      : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
                                 return (
-                                  <p className="mt-1 text-[11px] text-app-muted">
+                                  <p className={`mt-2 inline-flex rounded-md px-2 py-1 text-[11px] font-medium ${elapsedClass}`}>
                                     In stage: {elapsed}
                                   </p>
                                 );
