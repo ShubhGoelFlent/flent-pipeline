@@ -1452,8 +1452,7 @@ export default function PipelinePage() {
           editDraft={editDraft}
           setEditDraft={setEditDraft}
           fieldOptions={fieldOptions}
-          saving={saving}
-          saveError={saveError}
+            saveError={saveError}
           aiLoading={aiLoading}
           aiResult={aiResult}
           onClose={() => setSelected(null)}

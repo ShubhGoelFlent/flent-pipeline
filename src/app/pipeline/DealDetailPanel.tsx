@@ -29,7 +29,6 @@ type Props = {
   setEditDraft: Dispatch<SetStateAction<Record<string, string>>>;
   /** Options for dropdown-only columns (stage, disqualified, POC type, source); omit key for free text. */
   fieldOptions: Record<string, string[] | undefined>;
-  saving: boolean;
   saveError: string | null;
   aiLoading: boolean;
   aiResult: string | null;
@@ -145,7 +144,6 @@ export function DealDetailPanel({
   editDraft,
   setEditDraft,
   fieldOptions,
-  saving,
   saveError,
   aiLoading,
   aiResult,
@@ -420,35 +418,6 @@ export function DealDetailPanel({
             {aiResult}
           </div>
         )}
-
-        {/* Sticky actions so reps never need to scroll down to Save. */}
-        <div className="sticky bottom-0 left-0 right-0 border-t border-flentGreen/10 bg-app-surface p-3 z-20 dark:border-flentNight/15 dark:bg-[#0f172a]">
-          <div className="flex items-center justify-between gap-3">
-            {saving ? (
-              <span className="text-xs text-app-muted">Auto-saving…</span>
-            ) : (
-              <span className="text-xs text-app-muted">Edits auto-apply to Sheets</span>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={aiLoading}
-                onClick={() => onAiScore(false)}
-                className="rounded-lg border border-app-border bg-app-surface2 px-3 py-2 text-sm text-app-text hover:bg-app-hover disabled:opacity-50 dark:border-flentNight/20 dark:bg-app-hover-night dark:text-flentCyan/90 dark:hover:bg-app-hover-night-strong"
-              >
-                {aiLoading ? "…" : "AI score"}
-              </button>
-              <button
-                type="button"
-                disabled={aiLoading}
-                onClick={() => onAiScore(true)}
-                className="rounded-lg border border-flentGreen/45 bg-flentGreen/12 px-3 py-2 text-sm font-semibold text-flentGreen hover:bg-flentGreen/20 disabled:opacity-50 dark:border-flentCyan/35 dark:bg-flentGreen/20 dark:text-flentCyan dark:hover:bg-flentGreen/28"
-              >
-                Score + sheet
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
       </div>
       </aside>
