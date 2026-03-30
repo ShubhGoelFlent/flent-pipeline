@@ -814,7 +814,7 @@ export default function PipelinePage() {
       </header>
 
       {/* KPI strip */}
-      <section className="border-b border-app-border bg-app-surface2/80 backdrop-blur-sm">
+      <section className="border-b border-app-border bg-app-surface2">
         <div className="mx-auto grid max-w-[1600px] grid-cols-2 gap-4 px-4 py-8 sm:px-6 md:grid-cols-3 lg:grid-cols-5 lg:gap-5 lg:px-10">
         <div className="rounded-xl border border-app-border bg-app-card px-4 py-3 shadow-sm shadow-flentNight/5">
           <p className="text-[11px] uppercase tracking-wider text-app-muted">Total in tab</p>
@@ -1163,7 +1163,7 @@ export default function PipelinePage() {
           )}
 
           {!loading && !data?.error && viewMode === "table" && visibleDeals.length > 0 && (
-            <div className="max-h-[72vh] overflow-auto rounded-2xl border border-app-border bg-app-panel/95 shadow-brand backdrop-blur-sm">
+            <div className="relative isolate max-h-[72vh] overflow-auto rounded-2xl border border-app-border bg-app-panel shadow-brand">
               <table className="w-full min-w-[880px] text-left text-sm">
                 <thead className="sticky top-0 z-30">
                   <tr className="border-b border-app-border text-[11px] uppercase tracking-wider text-app-muted shadow-[0_1px_0_0_rgba(148,163,184,0.35)]">
@@ -1407,7 +1407,7 @@ export default function PipelinePage() {
                         if (!rowId) return;
                         void moveDealToStage(rowId, stage);
                       }}
-                      className={`w-[292px] shrink-0 rounded-2xl border bg-app-panel/95 p-3 shadow-brand backdrop-blur-sm transition ${
+                      className={`w-[292px] shrink-0 rounded-2xl border bg-app-panel p-3 shadow-brand transition ${
                         dropActive
                           ? "border-flentGreen/55 ring-2 ring-flentGreen/25"
                           : "border-app-border"
