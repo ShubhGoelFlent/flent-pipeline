@@ -292,35 +292,104 @@ export default function PipelinePage() {
     });
   }, [stageCounts]);
 
+  /**
+   * Scope for owner pill counts: same as table except **owner** selection.
+   * This keeps owner chips comparable while reflecting the active slice.
+   */
+  const dealsForOwnerStats = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const stageSet = new Set(stageFilters);
+    const sourceSet = new Set(sourceFilters);
+    return recentDeals.filter((d) => {
+      if (warmFunnelOnly && !isWarmPipelineStage(d[STAGE_KEY])) {
+        return false;
+      }
+      if (stageSet.size > 0) {
+        const stage = String(d[STAGE_KEY] ?? "").trim();
+        if (!stageSet.has(stage)) return false;
+      }
+      if (sourceSet.size > 0) {
+        const source = String(d[SOURCE_KEY] ?? "").trim() || "(unassigned)";
+        if (!sourceSet.has(source)) return false;
+      }
+      if (!q) return true;
+      return Object.values(d).some((v) =>
+        String(v).toLowerCase().includes(q),
+      );
+    });
+  }, [recentDeals, query, stageFilters, sourceFilters, warmFunnelOnly]);
+
   const ownerCounts = useMemo(() => {
     const m = new Map<string, number>();
-    for (const d of recentDeals) {
+    for (const d of dealsForOwnerStats) {
       const owner = String(d[OWNER_KEY] ?? "").trim() || "(unassigned)";
       m.set(owner, (m.get(owner) ?? 0) + 1);
     }
     return m;
-  }, [recentDeals]);
+  }, [dealsForOwnerStats]);
   const ownerOptions = useMemo(
     () =>
-      Array.from(ownerCounts.entries())
+      Array.from(
+        new Set(
+          recentDeals.map(
+            (d) => String(d[OWNER_KEY] ?? "").trim() || "(unassigned)",
+          ),
+        ),
+      )
+        .map((name) => [name, ownerCounts.get(name) ?? 0] as const)
         .sort((a, b) => b[1] - a[1])
         .map(([name]) => name),
-    [ownerCounts],
+    [recentDeals, ownerCounts],
   );
+
+  /**
+   * Scope for source pill counts: same as table except **source** selection.
+   * Selecting owner/stage/search should immediately rebucket source totals.
+   */
+  const dealsForSourceStats = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const stageSet = new Set(stageFilters);
+    const ownerSet = new Set(ownerFilters);
+    return recentDeals.filter((d) => {
+      if (warmFunnelOnly && !isWarmPipelineStage(d[STAGE_KEY])) {
+        return false;
+      }
+      if (stageSet.size > 0) {
+        const stage = String(d[STAGE_KEY] ?? "").trim();
+        if (!stageSet.has(stage)) return false;
+      }
+      if (ownerSet.size > 0) {
+        const owner = String(d[OWNER_KEY] ?? "").trim() || "(unassigned)";
+        if (!ownerSet.has(owner)) return false;
+      }
+      if (!q) return true;
+      return Object.values(d).some((v) =>
+        String(v).toLowerCase().includes(q),
+      );
+    });
+  }, [recentDeals, query, stageFilters, ownerFilters, warmFunnelOnly]);
+
   const sourceCounts = useMemo(() => {
     const m = new Map<string, number>();
-    for (const d of recentDeals) {
+    for (const d of dealsForSourceStats) {
       const source = String(d[SOURCE_KEY] ?? "").trim() || "(unassigned)";
       m.set(source, (m.get(source) ?? 0) + 1);
     }
     return m;
-  }, [recentDeals]);
+  }, [dealsForSourceStats]);
   const sourceOptions = useMemo(
     () =>
-      Array.from(sourceCounts.entries())
+      Array.from(
+        new Set(
+          recentDeals.map(
+            (d) => String(d[SOURCE_KEY] ?? "").trim() || "(unassigned)",
+          ),
+        ),
+      )
+        .map((name) => [name, sourceCounts.get(name) ?? 0] as const)
         .sort((a, b) => b[1] - a[1])
         .map(([name]) => name),
-    [sourceCounts],
+    [recentDeals, sourceCounts],
   );
 
   const filteredDeals = useMemo(() => {
