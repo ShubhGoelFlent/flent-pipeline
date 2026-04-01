@@ -2,6 +2,7 @@
 export const STAGE_KEY = "Deal Stage";
 export const RENT_KEY = "Expected Rent";
 export const OWNER_KEY = "Deal Owner";
+export const ADDED_BY_KEY = "Added by";
 export const SOURCE_KEY = "Source";
 export const CLUSTER_KEY = "Cluster";
 export const DATE_ADDED_KEY = "Date Added";
@@ -17,7 +18,7 @@ export const ACTIVE_DAYS_WINDOW = 60;
 /** Hidden from pipeline table + detail panel; data still loads/saves via the sheet. */
 export const PIPELINE_HIDDEN_COLUMN_KEYS = new Set([
   "Property Type",
-  "Added by",
+  ADDED_BY_KEY,
   "POC Email",
   "Google Drive Link (Media)",
   "After Sep 1",

@@ -5,11 +5,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DealDetailPanel } from "./DealDetailPanel";
 import Link from "next/link";
 import {
+  ADDED_BY_KEY,
   ACTIVE_DAYS_WINDOW,
   CLUSTER_KEY,
   DATE_ADDED_KEY,
   LISTING_LINK_KEY,
-  OWNER_KEY,
   PIPELINE_HIDDEN_COLUMN_KEYS,
   POC_NUMBER_KEY,
   RENT_KEY,
@@ -172,6 +172,11 @@ function toggleSelection(prev: string[], value: string): string[] {
   return [...prev, value];
 }
 
+/** "Owner" filters are attribution-based (Added by), with fallback for older sheets. */
+function ownerAttributionValue(d: Record<string, string | number>): string {
+  return String(d[ADDED_BY_KEY] ?? d["Added by"] ?? "").trim() || "(unassigned)";
+}
+
 export default function PipelinePage() {
   const [data, setData] = useState<DealsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -265,7 +270,7 @@ export default function PipelinePage() {
         return false;
       }
       if (ownerSet.size > 0) {
-        const owner = String(d[OWNER_KEY] ?? "").trim() || "(unassigned)";
+        const owner = ownerAttributionValue(d);
         if (!ownerSet.has(owner)) return false;
       }
       if (sourceSet.size > 0) {
@@ -322,7 +327,7 @@ export default function PipelinePage() {
   const ownerCounts = useMemo(() => {
     const m = new Map<string, number>();
     for (const d of dealsForOwnerStats) {
-      const owner = String(d[OWNER_KEY] ?? "").trim() || "(unassigned)";
+      const owner = ownerAttributionValue(d);
       m.set(owner, (m.get(owner) ?? 0) + 1);
     }
     return m;
@@ -332,7 +337,7 @@ export default function PipelinePage() {
       Array.from(
         new Set(
           recentDeals.map(
-            (d) => String(d[OWNER_KEY] ?? "").trim() || "(unassigned)",
+            (d) => ownerAttributionValue(d),
           ),
         ),
       )
@@ -359,7 +364,7 @@ export default function PipelinePage() {
         if (!stageSet.has(stage)) return false;
       }
       if (ownerSet.size > 0) {
-        const owner = String(d[OWNER_KEY] ?? "").trim() || "(unassigned)";
+        const owner = ownerAttributionValue(d);
         if (!ownerSet.has(owner)) return false;
       }
       if (!q) return true;
@@ -406,7 +411,7 @@ export default function PipelinePage() {
         if (!stageSet.has(stage)) return false;
       }
       if (ownerSet.size > 0) {
-        const owner = String(d[OWNER_KEY] ?? "").trim() || "(unassigned)";
+        const owner = ownerAttributionValue(d);
         if (!ownerSet.has(owner)) return false;
       }
       if (sourceSet.size > 0) {
