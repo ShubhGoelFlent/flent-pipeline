@@ -10,6 +10,7 @@ import {
   CLUSTER_KEY,
   DATE_ADDED_KEY,
   LISTING_LINK_KEY,
+  OWNER_KEY,
   PIPELINE_HIDDEN_COLUMN_KEYS,
   POC_NUMBER_KEY,
   RENT_KEY,
@@ -172,11 +173,6 @@ function toggleSelection(prev: string[], value: string): string[] {
   return [...prev, value];
 }
 
-/** "Owner" filters are attribution-based (Added by), with fallback for older sheets. */
-function ownerAttributionValue(d: Record<string, string | number>): string {
-  return String(d[ADDED_BY_KEY] ?? d["Added by"] ?? "").trim() || "(unassigned)";
-}
-
 export default function PipelinePage() {
   const [data, setData] = useState<DealsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -239,8 +235,31 @@ export default function PipelinePage() {
 
   const columns = useMemo(() => data?.columns ?? [], [data?.columns]);
   const deals = useMemo(() => data?.deals ?? [], [data?.deals]);
+  const ownerAttributionKey = useMemo(
+    () =>
+      resolveColumnKey(columns, [
+        ADDED_BY_KEY,
+        "Added By",
+        "Added by ",
+        "Added By ",
+      ]) ?? ADDED_BY_KEY,
+    [columns],
+  );
   const dealsRef = useRef(deals);
   dealsRef.current = deals;
+
+  /** "Owner" filters are attribution-based (Added by), with fallback for older sheets. */
+  const ownerAttributionValue = useCallback(
+    (d: Record<string, string | number>) =>
+      String(
+        d[ownerAttributionKey] ??
+          d[ADDED_BY_KEY] ??
+          d["Added by"] ??
+          d[OWNER_KEY] ??
+          "",
+      ).trim() || "(unassigned)",
+    [ownerAttributionKey],
+  );
 
   /** All non-DQ deals in the 60d window (includes Under contract / onboarded). */
   const recentDeals = useMemo(() => {
@@ -282,7 +301,7 @@ export default function PipelinePage() {
         String(v).toLowerCase().includes(q),
       );
     });
-  }, [recentDeals, query, ownerFilters, sourceFilters, warmFunnelOnly]);
+  }, [recentDeals, query, ownerFilters, sourceFilters, warmFunnelOnly, ownerAttributionValue]);
 
   const stageCounts = useMemo(
     () => countByStage(dealsForStageStats),
@@ -331,7 +350,7 @@ export default function PipelinePage() {
       m.set(owner, (m.get(owner) ?? 0) + 1);
     }
     return m;
-  }, [dealsForOwnerStats]);
+  }, [dealsForOwnerStats, ownerAttributionValue]);
   const ownerOptions = useMemo(
     () =>
       Array.from(
@@ -344,7 +363,7 @@ export default function PipelinePage() {
         .map((name) => [name, ownerCounts.get(name) ?? 0] as const)
         .sort((a, b) => b[1] - a[1])
         .map(([name]) => name),
-    [recentDeals, ownerCounts],
+    [recentDeals, ownerCounts, ownerAttributionValue],
   );
 
   /**
@@ -372,7 +391,7 @@ export default function PipelinePage() {
         String(v).toLowerCase().includes(q),
       );
     });
-  }, [recentDeals, query, stageFilters, ownerFilters, warmFunnelOnly]);
+  }, [recentDeals, query, stageFilters, ownerFilters, warmFunnelOnly, ownerAttributionValue]);
 
   const sourceCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -423,7 +442,7 @@ export default function PipelinePage() {
         String(v).toLowerCase().includes(q),
       );
     });
-  }, [recentDeals, query, stageFilters, ownerFilters, sourceFilters, warmFunnelOnly]);
+  }, [recentDeals, query, stageFilters, ownerFilters, sourceFilters, warmFunnelOnly, ownerAttributionValue]);
 
   const { aiRecommendedRows, aiRecommendedCount } = useMemo(() => {
     const picks = getAiPicksToBeContacted(filteredDeals);
