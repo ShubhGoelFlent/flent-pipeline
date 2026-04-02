@@ -131,6 +131,16 @@ Redeploy after changing env vars (Deployments → … → Redeploy, or push a co
 - Open `https://<your-project>.vercel.app/pipeline`
 - `https://<your-project>.vercel.app/api/health` should not report missing config.
 
+### If Production shows “Failed to deploy” (red X)
+
+The live site stays on the **last successful** deployment until a new one **succeeds**. Open the failed deployment → **Building** → **View build logs** and read the first real error (TypeScript, missing module, wrong directory, etc.).
+
+Common fixes:
+
+- **Root Directory** — If the Git repo root is not the Next app (e.g. app lives in `flent-pipeline/`), set **Project → Settings → General → Root Directory** to that folder so `package.json` is found.
+- **Node** — This repo expects **Node 20+** (`engines` in `package.json`). In Vercel: **Settings → General → Node.js Version** = 20.x.
+- **Install/build** — Ensure **Build Command** is `npm run build` (or leave default for Next.js).
+
 ### Other hosts (Railway, Render, Fly.io, Cloud Run)
 
 Use **Node** runtime: install deps, `npm run build`, start with `npm run start` (port from `PORT` env). Provide the same env vars as above; **`GOOGLE_SERVICE_ACCOUNT_JSON`** is still the practical way to pass credentials.
