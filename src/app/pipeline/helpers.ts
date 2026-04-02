@@ -13,7 +13,7 @@ export const OWNER_FROM_COLUMN_K_KEY = "_ownerColumnK";
 /** Google Sheets column K → 0-based index (A=0, …, K=10). */
 export const OWNER_SHEET_COLUMN_K_INDEX = 10;
 
-/** Owner shown in filters, agent, and links — column K when the sheet has ≥11 columns. */
+/** Owner shown in filters, agent, and links — sheet column K (row value index 10 when range starts at A). */
 export function ownerValueForDeal(
   deal: Record<string, string | number>,
 ): string {
