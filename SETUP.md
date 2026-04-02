@@ -78,28 +78,6 @@ You already shared the workbook and tab: **Supply Pipeline** spreadsheet, tab **
 
 Open [http://localhost:3000/pipeline](http://localhost:3000/pipeline). If something fails, open [http://localhost:3000/api/deals](http://localhost:3000/api/deals) and read the `message` field.
 
-## Auth setup (Google + @flent.in allowlist)
-
-This app now requires sign-in for all pages and API routes, and only allows `@flent.in` emails.
-
-Add these in `.env.local`:
-
-```bash
-AUTH_SECRET= # generate with: openssl rand -base64 32
-AUTH_GOOGLE_ID=
-AUTH_GOOGLE_SECRET=
-# Optional (defaults to flent.in)
-# AUTH_ALLOWED_DOMAIN=flent.in
-```
-
-Create OAuth credentials in Google Cloud Console:
-
-1. APIs & Services → Credentials → Create credentials → OAuth client ID (Web application)
-2. Authorized redirect URI (local): `http://localhost:3000/api/auth/callback/google`
-3. For Vercel/prod, add: `https://<your-domain>/api/auth/callback/google`
-
-After setting env vars, run `npm run dev` and visit `/pipeline` — you should be redirected to `/sign-in`.
-
 ## API checks
 
 - `GET /api/health` — whether Sheets env is set.
@@ -141,10 +119,6 @@ Set for **Production** (and **Preview** if you want previews to hit real data):
 | `GOOGLE_SPREADSHEET_ID` | Yes | Same as local. |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Yes | **Use inline JSON** (Vercel has no filesystem key file). Minify to one line: `jq -c . path/to/key.json` and paste the whole string. |
 | `GOOGLE_SHEET_RANGE` | Yes | e.g. `SupplyDump!A:ZZ` |
-| `AUTH_SECRET` | Yes | Random secret used by Auth.js sessions. |
-| `AUTH_GOOGLE_ID` | Yes | Google OAuth client ID. |
-| `AUTH_GOOGLE_SECRET` | Yes | Google OAuth client secret. |
-| `AUTH_ALLOWED_DOMAIN` | No | Defaults to `flent.in`; only matching emails can sign in. |
 | `OPENAI_API_KEY` | No | Agent chat narrative; omit if you only need the pipeline UI. |
 | `OPENAI_MODEL` | No | Defaults to `gpt-4.1-mini` in code. |
 
