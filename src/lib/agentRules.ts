@@ -7,8 +7,8 @@ import {
   SOURCE_KEY,
   STAGE_LAST_EDIT_KEY,
   STAGE_KEY,
-  OWNER_KEY,
   RENT_KEY,
+  ownerValueForDeal,
   effectiveUnitsForPerUnitRent,
   parseRent,
   parseSheetDate,
@@ -134,7 +134,7 @@ function countStrictlyNewerOpenLeads(
 }
 
 function buildRec(deal: PipelineDeal, extra?: Partial<Recommendation>): Recommendation {
-  const owner = String(deal[OWNER_KEY] ?? "").trim() || "(unassigned)";
+  const owner = ownerValueForDeal(deal);
   const configuration = String(deal[CONFIGURATION_KEY] ?? "").trim() || "—";
   const stage = String(deal[STAGE_KEY] ?? "").trim() || "—";
   const stageLastEdit = String(deal[STAGE_LAST_EDIT_KEY] ?? "").trim();

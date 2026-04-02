@@ -3,6 +3,34 @@ export const STAGE_KEY = "Deal Stage";
 export const RENT_KEY = "Expected Rent";
 export const OWNER_KEY = "Deal Owner";
 export const ADDED_BY_KEY = "Added by";
+
+/**
+ * Synthetic field appended in `rowsToDealRecords` from spreadsheet column **K**
+ * (0-based index 10), regardless of the header label in row 1.
+ */
+export const OWNER_FROM_COLUMN_K_KEY = "_ownerColumnK";
+
+/** Google Sheets column K → 0-based index (A=0, …, K=10). */
+export const OWNER_SHEET_COLUMN_K_INDEX = 10;
+
+/** Owner shown in filters, agent, and links — sheet column K (row value index 10 when range starts at A). */
+export function ownerValueForDeal(
+  deal: Record<string, string | number>,
+): string {
+  if (Object.prototype.hasOwnProperty.call(deal, OWNER_FROM_COLUMN_K_KEY)) {
+    return (
+      String(deal[OWNER_FROM_COLUMN_K_KEY] ?? "").trim() || "(unassigned)"
+    );
+  }
+  return (
+    String(
+      deal[OWNER_KEY] ??
+        deal[ADDED_BY_KEY] ??
+        deal["Added by"] ??
+        "",
+    ).trim() || "(unassigned)"
+  );
+}
 export const SOURCE_KEY = "Source";
 export const CLUSTER_KEY = "Cluster";
 export const DATE_ADDED_KEY = "Date Added";
@@ -17,6 +45,7 @@ export const ACTIVE_DAYS_WINDOW = 60;
 
 /** Hidden from pipeline table + detail panel; data still loads/saves via the sheet. */
 export const PIPELINE_HIDDEN_COLUMN_KEYS = new Set([
+  OWNER_FROM_COLUMN_K_KEY,
   "Property Type",
   ADDED_BY_KEY,
   "POC Email",

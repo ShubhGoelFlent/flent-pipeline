@@ -1,4 +1,8 @@
 import { google, sheets_v4 } from "googleapis";
+import {
+  OWNER_FROM_COLUMN_K_KEY,
+  OWNER_SHEET_COLUMN_K_INDEX,
+} from "@/app/pipeline/helpers";
 
 let cached: sheets_v4.Sheets | null = null;
 
@@ -78,6 +82,12 @@ export function rowsToDealRecords(rows: string[][]): {
     columns.forEach((col, i) => {
       obj[col.key] = String(line[i] ?? "").trim();
     });
+    // Column K = index 10 when `GOOGLE_SHEET_RANGE` starts at column A (e.g. `SupplyDump!A:ZZ`).
+    // Always read it: do not gate on `columns.length` — Sheets API often omits trailing empty
+    // header cells, so `columns` can be shorter than 11 even when column K has data in body rows.
+    obj[OWNER_FROM_COLUMN_K_KEY] = String(
+      line[OWNER_SHEET_COLUMN_K_INDEX] ?? "",
+    ).trim();
     deals.push(obj);
   }
   return { columns, deals };
