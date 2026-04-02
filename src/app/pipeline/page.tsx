@@ -5,12 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DealDetailPanel } from "./DealDetailPanel";
 import Link from "next/link";
 import {
-  ADDED_BY_KEY,
   ACTIVE_DAYS_WINDOW,
   CLUSTER_KEY,
   DATE_ADDED_KEY,
   LISTING_LINK_KEY,
-  OWNER_KEY,
   PIPELINE_HIDDEN_COLUMN_KEYS,
   POC_NUMBER_KEY,
   RENT_KEY,
@@ -25,6 +23,7 @@ import {
   stageSortIndex,
   stageBadgeClass,
   stageConcept,
+  ownerValueForDeal,
 } from "./helpers";
 import { DROPDOWN_COLUMN_KEYS, selectOptionsForColumn } from "./columnOptions";
 import { getAiPicksToBeContacted } from "@/lib/agentRules";
@@ -235,33 +234,13 @@ export default function PipelinePage() {
 
   const columns = useMemo(() => data?.columns ?? [], [data?.columns]);
   const deals = useMemo(() => data?.deals ?? [], [data?.deals]);
-  const ownerColumnKey = useMemo(
-    () =>
-      resolveColumnKey(columns, [
-        OWNER_KEY,
-        "Deal Owner",
-        "Deal owner",
-        ADDED_BY_KEY,
-        "Added By",
-        "Added by ",
-        "Added By ",
-      ]) ?? OWNER_KEY,
-    [columns],
-  );
   const dealsRef = useRef(deals);
   dealsRef.current = deals;
 
-  /** Owner filters should reflect accountable reps (Deal Owner), not lead source attribution. */
+  /** Owner chips / filters use column K (see `ownerValueForDeal` + `rowsToDealRecords`). */
   const ownerAttributionValue = useCallback(
-    (d: Record<string, string | number>) =>
-      String(
-        d[ownerColumnKey] ??
-          d[OWNER_KEY] ??
-          d[ADDED_BY_KEY] ??
-          d["Added by"] ??
-          "",
-      ).trim() || "(unassigned)",
-    [ownerColumnKey],
+    (d: Record<string, string | number>) => ownerValueForDeal(d),
+    [],
   );
 
   /** All non-DQ deals in the 60d window (includes Under contract / onboarded). */
@@ -1260,15 +1239,15 @@ export default function PipelinePage() {
 
           {!loading && !data?.error && viewMode === "table" && visibleDeals.length > 0 && (
             <div className="relative isolate max-h-[72vh] overflow-auto rounded-2xl border border-app-border bg-app-panel shadow-brand">
-              <table className="w-full min-w-[880px] text-left text-sm">
-                <thead className="sticky top-0 z-30">
-                  <tr className="border-b border-app-border text-[11px] uppercase tracking-wider text-app-muted shadow-[0_1px_0_0_rgba(148,163,184,0.35)]">
+              <table className="w-full min-w-[880px] border-separate border-spacing-0 text-left text-sm">
+                <thead>
+                  <tr className="border-b border-app-border text-[11px] uppercase tracking-wider text-app-muted">
                     {visibleColumns.map((col) => {
                       const cw = tableColumnWidths(col);
                       return (
                         <th
                           key={col.key}
-                          className={`${cw.th} sticky top-0 z-30 bg-app-surface text-app-muted`}
+                          className={`${cw.th} sticky top-0 z-[35] bg-app-card text-app-muted shadow-[0_2px_6px_-1px_rgba(15,23,42,0.12)] dark:shadow-[0_3px_10px_-2px_rgba(0,0,0,0.55)]`}
                         >
                           {col.label}
                         </th>

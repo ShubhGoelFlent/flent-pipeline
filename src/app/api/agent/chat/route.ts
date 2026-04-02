@@ -28,8 +28,9 @@ import {
 import {
   countByStage,
   DATE_ADDED_KEY,
-  OWNER_KEY,
+  OWNER_FROM_COLUMN_K_KEY,
   SOURCE_KEY,
+  ownerValueForDeal,
   isActiveDeal,
   isOpenPipelineDeal,
   isUnderContractDeal,
@@ -238,15 +239,15 @@ export async function POST(request: Request) {
       deals: scopedDeals,
       resolved: ownerResolved,
       matchMode: ownerMatchMode,
-    } = matchDealsByOwnerScope(deals, OWNER_KEY, ownerScope);
+    } = matchDealsByOwnerScope(deals, OWNER_FROM_COLUMN_K_KEY, ownerScope);
 
     /** Names on the full open pipeline — used to match “how’s Ashish doing?” before scoping. */
     const ownerNamesForMatching = [
       ...new Set(
         deals
           .filter((d) => isOpenPipelineDeal(d))
-          .map((d) => String(d[OWNER_KEY] ?? "").trim())
-          .filter(Boolean),
+          .map((d) => ownerValueForDeal(d))
+          .filter((n) => n && n !== "(unassigned)"),
       ),
     ];
     const mentionedOwners = matchOwnersNamedInMessage(message, ownerNamesForMatching);
@@ -259,7 +260,7 @@ export async function POST(request: Request) {
     ) {
       const allow = new Set(mentionedOwners.map((n) => n.toLowerCase()));
       scopedDeals = deals.filter((d) =>
-        allow.has(String(d[OWNER_KEY] ?? "").trim().toLowerCase()),
+        allow.has(ownerValueForDeal(d).toLowerCase()),
       );
       ownerResolved =
         mentionedOwners.length === 1 ? mentionedOwners[0]! : mentionedOwners.join(" & ");
@@ -300,7 +301,7 @@ export async function POST(request: Request) {
     const ownerCounts = (() => {
       const m = new Map<string, number>();
       for (const d of openPipelineDeals) {
-        const owner = String(d[OWNER_KEY] ?? "").trim() || "(unassigned)";
+        const owner = ownerValueForDeal(d);
         m.set(owner, (m.get(owner) ?? 0) + 1);
       }
       return Array.from(m.entries())

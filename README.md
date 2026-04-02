@@ -6,6 +6,8 @@ Next.js app that reads **SupplyDump** (or any tab) via **Google Sheets API** and
 
 See [SETUP.md](./SETUP.md) for Google Cloud service account, sharing the sheet, and `.env.local`.
 
+Auth is enabled: only `@flent.in` Google accounts can access the app and API.
+
 **Push to GitHub:** step-by-step **[GITHUB.md](./GITHUB.md)**.
 
 **Deploy to production:** **[Production deploy (Vercel)](./SETUP.md#production-deploy-vercel--recommended)** in [SETUP.md](./SETUP.md) (env vars, root directory if the app is in a subfolder, CLI commands).
