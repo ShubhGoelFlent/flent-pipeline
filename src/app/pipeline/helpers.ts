@@ -5,15 +5,18 @@ export const OWNER_KEY = "Deal Owner";
 export const ADDED_BY_KEY = "Added by";
 
 /**
- * Synthetic field appended in `rowsToDealRecords` from spreadsheet column **K**
- * (0-based index 10), regardless of the header label in row 1.
+ * Synthetic field set in `rowsToDealRecords`: copy of the **Deal Owner** column,
+ * resolved by matching the header/key "Deal Owner", else env / fallback index.
  */
 export const OWNER_FROM_COLUMN_K_KEY = "_ownerColumnK";
 
-/** Google Sheets column K → 0-based index (A=0, …, K=10). */
-export const OWNER_SHEET_COLUMN_K_INDEX = 10;
+/**
+ * If row 1 has no "Deal Owner" header, use this 0-based column index (A=0).
+ * Default **9** = column **J** (SupplyDump layout: Deal Owner before Furnishing in K).
+ */
+export const OWNER_SHEET_OWNER_FALLBACK_INDEX = 9;
 
-/** Owner shown in filters, agent, and links — sheet column K (row value index 10 when range starts at A). */
+/** Owner shown in filters, agent, and links — uses `_ownerColumnK` when present. */
 export function ownerValueForDeal(
   deal: Record<string, string | number>,
 ): string {

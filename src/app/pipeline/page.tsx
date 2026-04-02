@@ -237,7 +237,7 @@ export default function PipelinePage() {
   const dealsRef = useRef(deals);
   dealsRef.current = deals;
 
-  /** Owner chips / filters use column K (see `ownerValueForDeal` + `rowsToDealRecords`). */
+  /** Owner chips / filters use `_ownerColumnK` (Deal Owner column — see `rowsToDealRecords`). */
   const ownerAttributionValue = useCallback(
     (d: Record<string, string | number>) => ownerValueForDeal(d),
     [],
@@ -1238,7 +1238,7 @@ export default function PipelinePage() {
           )}
 
           {!loading && !data?.error && viewMode === "table" && visibleDeals.length > 0 && (
-            <div className="relative isolate max-h-[72vh] overflow-auto rounded-2xl border border-app-border bg-app-panel shadow-brand">
+            <div className="pipeline-table-scroll relative max-h-[72vh] overflow-auto rounded-2xl border border-app-border bg-app-panel shadow-brand">
               <table className="w-full min-w-[880px] border-separate border-spacing-0 text-left text-sm">
                 <thead>
                   <tr className="border-b border-app-border text-[11px] uppercase tracking-wider text-app-muted">
@@ -1247,7 +1247,7 @@ export default function PipelinePage() {
                       return (
                         <th
                           key={col.key}
-                          className={`${cw.th} sticky top-0 z-[35] bg-app-card text-app-muted shadow-[0_2px_6px_-1px_rgba(15,23,42,0.12)] dark:shadow-[0_3px_10px_-2px_rgba(0,0,0,0.55)]`}
+                          className={`${cw.th} text-app-muted`}
                         >
                           {col.label}
                         </th>

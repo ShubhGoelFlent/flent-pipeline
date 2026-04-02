@@ -1,7 +1,7 @@
 import { google, sheets_v4 } from "googleapis";
 import {
   OWNER_FROM_COLUMN_K_KEY,
-  OWNER_SHEET_COLUMN_K_INDEX,
+  OWNER_SHEET_OWNER_FALLBACK_INDEX,
 } from "@/app/pipeline/helpers";
 
 let cached: sheets_v4.Sheets | null = null;
@@ -46,6 +46,22 @@ export function columnIndexToLetter(colIndex: number): string {
 
 export type ColumnDef = { key: string; label: string };
 
+/** Match SupplyDump "Deal Owner" column for owner filters (not column K — that is often Furnishing). */
+function resolveOwnerSourceColumnIndex(columns: ColumnDef[]): number {
+  const idx = columns.findIndex(
+    (c) =>
+      /^deal owner$/i.test(String(c.label ?? "").trim()) ||
+      /^deal owner$/i.test(String(c.key ?? "").trim()),
+  );
+  if (idx >= 0) return idx;
+  const raw = process.env.GOOGLE_OWNER_SHEET_COLUMN_INDEX?.trim();
+  if (raw) {
+    const n = Number.parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return OWNER_SHEET_OWNER_FALLBACK_INDEX;
+}
+
 /** Stable keys for duplicate headers (e.g. Comments, Comments (2)). */
 export function makeColumnDefs(rawHeaders: (string | undefined)[]): ColumnDef[] {
   const counts = new Map<string, number>();
@@ -72,6 +88,7 @@ export function rowsToDealRecords(rows: string[][]): {
   if (!rows.length) return { columns: [], deals: [] };
   const rawHeaders = rows[0] ?? [];
   const columns = makeColumnDefs(rawHeaders);
+  const ownerColIdx = resolveOwnerSourceColumnIndex(columns);
   const deals: DealRow[] = [];
 
   for (let r = 1; r < rows.length; r++) {
@@ -82,12 +99,7 @@ export function rowsToDealRecords(rows: string[][]): {
     columns.forEach((col, i) => {
       obj[col.key] = String(line[i] ?? "").trim();
     });
-    // Column K = index 10 when `GOOGLE_SHEET_RANGE` starts at column A (e.g. `SupplyDump!A:ZZ`).
-    // Always read it: do not gate on `columns.length` — Sheets API often omits trailing empty
-    // header cells, so `columns` can be shorter than 11 even when column K has data in body rows.
-    obj[OWNER_FROM_COLUMN_K_KEY] = String(
-      line[OWNER_SHEET_COLUMN_K_INDEX] ?? "",
-    ).trim();
+    obj[OWNER_FROM_COLUMN_K_KEY] = String(line[ownerColIdx] ?? "").trim();
     deals.push(obj);
   }
   return { columns, deals };
