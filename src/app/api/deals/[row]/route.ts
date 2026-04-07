@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import {
   appendRowToSheetTab,
   batchUpdateCells,
@@ -15,7 +14,6 @@ import { getServerEnv, sheetsConfigured } from "@/lib/env";
 import { resolveServiceAccountJson } from "@/lib/google-credentials";
 import { LOST_PIPELINE_STAGE } from "@/app/pipeline/helpers";
 
-const patchBodySchema = z.record(z.string(), z.string());
 const STAGE_KEY = "Deal Stage";
 const DISQ_KEY = "Disqualified";
 const STAGE_ENTERED_AT_KEY = "Stage Entered At";
@@ -41,6 +39,65 @@ const STAGE_TIME_COLUMNS_LEGACY: Record<string, string> = {
   "offer extended": "Time in Offer Extended (mins)",
   "under contract": "Time in Under contract (mins)",
 };
+
+/** Accept JSON numbers/booleans from clients; coerce to strings for Sheets. */
+function parsePatchBody(body: unknown): Record<string, string> | null {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
+    if (k === "_sheetRow") continue;
+    out[String(k)] = v === null || v === undefined ? "" : String(v);
+  }
+  return out;
+}
+
+function findSheetColumnKey(
+  columnKeysInOrder: string[],
+  ...candidates: string[]
+): string | undefined {
+  const lowerExact = new Map(
+    columnKeysInOrder.map((k) => [k.trim().toLowerCase(), k] as const),
+  );
+  for (const c of candidates) {
+    const hit = lowerExact.get(c.trim().toLowerCase());
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/** Last resort when header wording differs slightly from presets. */
+function findDealStageColumnKey(columnKeysInOrder: string[]): string | undefined {
+  const fromPresets = findSheetColumnKey(
+    columnKeysInOrder,
+    STAGE_KEY,
+    "Deal Stage",
+    "Deal stage",
+    "Deal  Stage",
+  );
+  if (fromPresets) return fromPresets;
+  return columnKeysInOrder.find(
+    (k) =>
+      /\bdeal\b/i.test(k) && /\bstage\b/i.test(k) && !/\btime in\b/i.test(k),
+  );
+}
+
+function remapPatchKeysToSheetColumns(
+  updates: Record<string, string>,
+  columnKeysInOrder: string[],
+): { mapped: Record<string, string>; unknownKeys: string[] } {
+  const lowerToCanonical = new Map<string, string>();
+  for (const k of columnKeysInOrder) {
+    lowerToCanonical.set(k.trim().toLowerCase(), k);
+  }
+  const mapped: Record<string, string> = {};
+  const unknownKeys: string[] = [];
+  for (const [k, v] of Object.entries(updates)) {
+    const canon = lowerToCanonical.get(k.trim().toLowerCase());
+    if (canon) mapped[canon] = v;
+    else unknownKeys.push(k);
+  }
+  return { mapped, unknownKeys };
+}
 
 function normalizeStage(stage: string | number | undefined): string {
   return String(stage ?? "")
@@ -170,18 +227,18 @@ export async function PATCH(
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  const parsed = patchBodySchema.safeParse(body);
-  if (!parsed.success) {
+  const rawUpdates = parsePatchBody(body);
+  if (!rawUpdates) {
     return NextResponse.json(
-      { error: "validation_error", details: parsed.error.flatten() },
+      {
+        error: "validation_error",
+        message: "Expected a JSON object mapping column keys to values.",
+      },
       { status: 400 },
     );
   }
 
-  const updates: Record<string, string> = { ...parsed.data };
-  delete updates._sheetRow;
-
-  if (Object.keys(updates).length === 0) {
+  if (Object.keys(rawUpdates).length === 0) {
     return NextResponse.json(
       { error: "empty_updates", message: "Send at least one column key to update." },
       { status: 400 },
@@ -211,21 +268,10 @@ export async function PATCH(
       );
     }
 
-    const nowIso = new Date().toISOString();
-    const previousStage = String(currentRow[STAGE_KEY] ?? "").trim();
-    const incomingStage = String(updates[STAGE_KEY] ?? previousStage).trim();
-    const previousStageCanonical = canonicalStageForTiming(previousStage);
-    const incomingStageCanonical = canonicalStageForTiming(incomingStage);
-    const stageChanged = !!incomingStage && incomingStage !== previousStage;
-
-    const incomingDisq = updates[DISQ_KEY] ?? String(currentRow[DISQ_KEY] ?? "");
-    const disqualified = isDisqualifiedValue(incomingDisq);
-
     const existingHeaderKeys = columns.map((c) => c.key);
     const { byStage: effectiveTimeColumns, missingHeadersToCreate } =
       resolveEffectiveTimeColumns(existingHeaderKeys);
 
-    // Ensure only missing required columns exist; avoid creating dual (legacy + new) sets.
     const headersInOrder = await ensureHeaders(
       env.GOOGLE_SPREADSHEET_ID!,
       env.GOOGLE_SHEET_RANGE,
@@ -233,11 +279,66 @@ export async function PATCH(
       credentials,
     );
 
+    const columnKeysInOrder = makeColumnDefs(headersInOrder).map((c) => c.key);
+
+    const { mapped: patch, unknownKeys } = remapPatchKeysToSheetColumns(
+      rawUpdates,
+      columnKeysInOrder,
+    );
+    if (unknownKeys.length) {
+      return NextResponse.json(
+        {
+          error: "unknown_columns",
+          message: `Unknown column key(s): ${unknownKeys.join(", ")}. Reload if the sheet headers changed.`,
+          unknownKeys,
+        },
+        { status: 400 },
+      );
+    }
+
+    const stageCol = findDealStageColumnKey(columnKeysInOrder);
+    if (!stageCol) {
+      return NextResponse.json(
+        {
+          error: "missing_deal_stage_header",
+          message:
+            "No Deal Stage column found in row 1. Add a “Deal Stage” header or reload after fixing the sheet.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const disqCol = findSheetColumnKey(
+      columnKeysInOrder,
+      DISQ_KEY,
+      "Disqualified",
+      "Disqualified ",
+    );
+    const stageEnteredCol = findSheetColumnKey(
+      columnKeysInOrder,
+      STAGE_ENTERED_AT_KEY,
+      "Stage Entered At",
+      "Stage entered at",
+    );
+
+    const nowIso = new Date().toISOString();
+    const previousStage = String(currentRow[stageCol] ?? "").trim();
+    const incomingStage = String(patch[stageCol] ?? previousStage).trim();
+    const previousStageCanonical = canonicalStageForTiming(previousStage);
+    const incomingStageCanonical = canonicalStageForTiming(incomingStage);
+    const stageChanged = !!incomingStage && incomingStage !== previousStage;
+
+    const incomingDisq =
+      disqCol != null
+        ? patch[disqCol] ?? String(currentRow[disqCol] ?? "")
+        : "";
+    const disqualified = isDisqualifiedValue(incomingDisq);
+
     // Add elapsed minutes to the stage being exited.
     if ((stageChanged || disqualified) && previousStageCanonical) {
       const timeCol = effectiveTimeColumns[previousStageCanonical];
-      if (timeCol) {
-        const enteredAtRaw = String(currentRow[STAGE_ENTERED_AT_KEY] ?? "").trim();
+      if (timeCol && stageEnteredCol) {
+        const enteredAtRaw = String(currentRow[stageEnteredCol] ?? "").trim();
         const enteredAt = enteredAtRaw ? new Date(enteredAtRaw) : null;
         if (enteredAt && !Number.isNaN(enteredAt.getTime())) {
           const elapsedMs = Date.now() - enteredAt.getTime();
@@ -245,29 +346,28 @@ export async function PATCH(
           const existingMinutes = parseDurationToMinutes(
             String(currentRow[timeCol] ?? ""),
           );
-          updates[timeCol] = formatMinutesHuman(existingMinutes + elapsedMinutes);
+          patch[timeCol] = formatMinutesHuman(existingMinutes + elapsedMinutes);
         }
       }
     }
 
-    // If disqualified, stop timer. Otherwise refresh entry time on stage change.
-    if (disqualified) {
-      updates[STAGE_ENTERED_AT_KEY] = "";
-    } else if (stageChanged && incomingStageCanonical) {
-      updates[STAGE_ENTERED_AT_KEY] = nowIso;
-    } else if (!String(currentRow[STAGE_ENTERED_AT_KEY] ?? "").trim() && incomingStageCanonical) {
-      // Backfill for existing rows that never had timing enabled.
-      updates[STAGE_ENTERED_AT_KEY] = nowIso;
+    if (stageEnteredCol) {
+      if (disqualified) {
+        patch[stageEnteredCol] = "";
+      } else if (stageChanged && incomingStageCanonical) {
+        patch[stageEnteredCol] = nowIso;
+      } else if (
+        !String(currentRow[stageEnteredCol] ?? "").trim() &&
+        incomingStageCanonical
+      ) {
+        patch[stageEnteredCol] = nowIso;
+      }
     }
-
-    // Mirror UI keying for duplicate headers (e.g. "Comments", "Comments (2)")
-    // so PATCH updates can target the correct duplicate column by index.
-    const columnKeysInOrder = makeColumnDefs(headersInOrder).map((c) => c.key);
 
     const mainTab = parseTabNameFromRange(env.GOOGLE_SHEET_RANGE);
     const lostTab = env.GOOGLE_LOST_SHEET_NAME.trim();
-    const previousStageRaw = String(currentRow[STAGE_KEY] ?? "").trim();
-    const finalStage = String(updates[STAGE_KEY] ?? currentRow[STAGE_KEY] ?? "").trim();
+    const previousStageRaw = String(currentRow[stageCol] ?? "").trim();
+    const finalStage = String(patch[stageCol] ?? currentRow[stageCol] ?? "").trim();
     /** Only append a copy to the Lost tab when transitioning into Lost (avoid duplicate rows on every save). */
     const movingToLost =
       finalStage.toLowerCase() === LOST_PIPELINE_STAGE.toLowerCase() &&
@@ -277,7 +377,7 @@ export async function PATCH(
     if (movingToLost) {
       const mergedValues = buildMergedRowValues(
         currentRow,
-        updates,
+        patch,
         columnKeysInOrder,
       );
       await ensureLostWorksheetWithHeaders(
@@ -298,7 +398,7 @@ export async function PATCH(
       env.GOOGLE_SPREADSHEET_ID!,
       env.GOOGLE_SHEET_RANGE,
       sheetRow,
-      updates,
+      patch,
       columnKeysInOrder,
       credentials,
     );
@@ -306,7 +406,7 @@ export async function PATCH(
     return NextResponse.json({
       ok: true,
       sheetRow,
-      updated: Object.keys(updates),
+      updated: Object.keys(patch),
       ...(movingToLost
         ? { movedToLost: true, lostSheet: lostTab }
         : {}),
